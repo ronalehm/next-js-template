@@ -1,2 +1,2 @@
 # next-js-template
-template para nuevos proyectos
+usaremos esta plantilla para los proyectos de Ronald
