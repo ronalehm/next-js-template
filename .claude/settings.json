@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.claude/spec-approval.key)",
+      "Edit(~/.claude/spec-approval.key)",
+      "Write(~/.claude/spec-approval.key)",
+      "Edit(docs/specs/approvals.jsonl)",
+      "Write(docs/specs/approvals.jsonl)",
+      "Bash(*spec-approval.key*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-approval.mjs\" record"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-approval.mjs\" gate"
+          }
+        ]
+      }
+    ]
+  }
+}
