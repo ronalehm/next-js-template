@@ -25,7 +25,7 @@ Tu salida es un único archivo: `docs/specs/<module>-<feature>.md` (kebab-case, 
    - Pon primero, como tareas secuenciales, todo lo que toca archivos compartidos: instalar dependencias o componentes shadcn, `package.json`, `app/layout.tsx`, `app/providers.tsx`, `lib/`, `components/ui/`, `components/shared/` y los `index.ts` de módulos.
    - Dos tareas solo son paralelizables si sus listas de archivos son disjuntas y ninguna depende de la otra.
    - **Alcanzable en una sesión:** máximo 5 tareas y ~15 archivos por fase. Si el pedido es mayor, divídelo en fases (`### Fase 1`, `### Fase 2`…), cada una entregable y funcional por sí misma; los criterios de aceptación indican a qué fase pertenecen.
-4. **Estado y aprobación:** nunca escribas `Estado: aprobado`; la aprobación es exclusiva del usuario (escribe "apruebo" en el chat) y la registra un hook, junto con quién aprobó. Nunca edites `docs/specs/approvals.jsonl`. Una spec nueva va con `Estado: borrador`. Si modificas una spec aprobada, vuelve a ponerla en `Estado: borrador`.
+4. **Estado y aprobación:** crea y guarda siempre la spec con `Estado: borrador`; nunca escribas `Estado: aprobado` (un hook lo bloquea); la aprobación es exclusiva del usuario (escribe "apruebo docs/specs/<slug>.md" en el chat) y la registra un hook, junto con quién aprobó. Nunca edites `docs/specs/approvals.jsonl`. Una spec nueva va con `Estado: borrador`. Si modificas una spec aprobada, vuelve a ponerla en `Estado: borrador`.
 5. **Dudas:** no inventes requisitos de negocio. Si algo no está claro, regístralo en `## Preguntas abiertas` al final de la spec.
 
 ## Respuesta

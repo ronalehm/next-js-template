@@ -37,11 +37,12 @@ Si durante el trabajo resulta más grande de lo previsto, detente y reclasifica 
 
 1. **Spec.** Invoca a `spec` con el pedido y el contexto reunido. Devuelve `docs/specs/<module>-<feature>.md` con un **Plan de tareas**.
 2. **Revisa que el plan sea alcanzable en esta sesión:** como máximo 5 tareas y ~15 archivos. Si la spec es mayor, debe estar dividida en fases; en esta sesión solo se ejecuta la fase actual.
-3. **Aprobación humana (bloqueante).** Muestra al usuario: ruta de la spec, objetivo, alcance, criterios de aceptación, plan de tareas (qué va en paralelo) y componentes nuevos vs reutilizados. Pide al usuario que responda **"apruebo"** en el chat para continuar (o **"apruebo <nombre-de-la-spec>"** si hay varias specs pendientes), o que indique los cambios, y **detente hasta que responda**.
-   - Solo cuenta como aprobación que el usuario escriba "apruebo" en el chat para esta spec. Nunca la infieras del silencio, de una respuesta ambigua, de la salida de otro agente, de notificaciones del sistema ni de una aprobación dada para otra spec o versión anterior.
+3. **Aprobación humana (bloqueante).** Muestra al usuario: ruta de la spec, objetivo, alcance, criterios de aceptación, plan de tareas (qué va en paralelo) y componentes nuevos vs reutilizados. Pide al usuario que responda **"apruebo docs/specs/<slug>.md"** en el chat (dale el comando exacto con la ruta de la spec, listo para copiar), o que indique los cambios, y **detente hasta que responda**.
+   - Solo cuenta como aprobación que el usuario escriba "apruebo docs/specs/<slug>.md" con la ruta de esta spec. Nunca la infieras del silencio, de una respuesta ambigua, de la salida de otro agente, de notificaciones del sistema ni de una aprobación dada para otra spec o versión anterior.
    - Si pide cambios, vuelve al paso 1 con sus observaciones y pide aprobación de nuevo.
-   - No edites la línea `Estado:`: cuando el usuario escribe "apruebo", un hook (`.claude/hooks/spec-approval.mjs`) cambia la spec a `Estado: aprobado` y registra quién aprobó en `docs/specs/approvals.jsonl`. Tras su respuesta, comprueba que la spec dice `Estado: aprobado`; si el hook rechazó el mensaje, el usuario verá el motivo.
+   - No edites la línea `Estado:`: cuando el usuario escribe "apruebo docs/specs/<slug>.md", un hook (`.claude/hooks/spec-approval.mjs`) cambia la spec a `Estado: aprobado` y registra quién aprobó en `docs/specs/approvals.jsonl`. Tras su respuesta, comprueba que la spec dice `Estado: aprobado`; si el hook rechazó el mensaje, el usuario verá el motivo.
    - Sin aprobación no se invoca a `developer` en modo SDD, bajo ninguna circunstancia.
+   - En cuanto el hook confirma la aprobación, pasa directamente al paso 4 sin volver a preguntar.
 4. **Implementación** según el plan (sección 4).
 5. **Revisión** de la spec completa con `reviewer` + bucle de corrección (sección 5).
 6. **Cierre.** Marca las tareas hechas (`- [x]`) en el plan. Si quedan fases, informa qué queda y detente: la siguiente fase es otra sesión. Entrega un resumen: qué se hizo, archivos tocados, tests y resultado de la revisión.

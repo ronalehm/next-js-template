@@ -1,5 +1,5 @@
 // Spec approval hooks (see docs/SETUP.md §3).
-//   record (UserPromptSubmit): a user message "apruebo [spec-name]" approves a pending spec:
+//   record (UserPromptSubmit): a user message "apruebo docs/specs/<slug>.md" approves that spec:
 //     sets `Estado: aprobado` and appends { spec, hash, approver, date, sig } to docs/specs/approvals.jsonl.
 //     Only real user prompts trigger this hook, so agents cannot approve.
 //     `sig` is an HMAC with a per-machine key kept outside the repo (~/.claude/spec-approval.key), so
@@ -79,37 +79,39 @@ function approver() {
 }
 
 function record() {
-  const match = (input.prompt ?? "").trim().match(/^apruebo(?:\s+([\w-]+?)(?:\.md)?)?$/i);
-  if (!match) return;
+  const prompt = (input.prompt ?? "").trim();
+  const match = prompt.match(/^apruebo\s+(?:\.[\\/])?docs[\\/]specs[\\/]([\w-]+)\.md$/i);
 
-  const dir = resolve(root, SPECS);
-  const specs = existsSync(dir)
-    ? readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => `${SPECS}/${f}`)
-    : [];
-  const pending = specs.filter((spec) => !isValid(spec, read(spec)));
-
-  let spec;
-  if (match[1]) {
-    spec = `${SPECS}/${match[1]}.md`;
-    if (!specs.includes(spec)) block(`la spec ${spec} no existe.`);
-    if (!pending.includes(spec)) block(`la spec ${spec} ya está aprobada y sin cambios.`);
-  } else if (pending.length === 1) {
-    spec = pending[0];
-  } else if (pending.length === 0) {
-    block("no hay specs pendientes de aprobación.");
-  } else {
-    const names = pending.map((s) => s.slice(SPECS.length + 1, -3)).join(", ");
-    block(`hay varias specs pendientes (${names}). Escribe "apruebo <nombre>".`);
+  if (!match) {
+    // "apruebo" or "apruebo <algo>" looks like an approval attempt: reject it so the user isn't misled.
+    if (!/^apruebo(\s+\S+)?$/i.test(prompt)) return;
+    const dir = resolve(root, SPECS);
+    const pending = (existsSync(dir) ? readdirSync(dir) : [])
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => `${SPECS}/${f}`)
+      .filter((s) => !isValid(s, read(s)));
+    block(
+      `para aprobar escribe exactamente "apruebo docs/specs/<slug>.md".` +
+        (pending.length ? ` Pendientes: ${pending.join(", ")}.` : " No hay specs pendientes."),
+    );
   }
 
+  const spec = `${SPECS}/${match[1]}.md`;
+  if (!existsSync(resolve(root, spec))) block(`la spec ${spec} no existe.`);
   const text = read(spec);
+  if (isValid(spec, text)) block(`la spec ${spec} ya está aprobada y sin cambios.`);
   if (!STATE_LINE.test(text)) block(`la spec ${spec} no tiene línea "Estado:".`);
   const approved = text.replace(STATE_LINE, "$1aprobado");
   const entry = { spec, hash: hash(approved), approver: approver(), date: new Date().toISOString() };
   entry.sig = sign(key({ create: true }), entry);
   writeFileSync(resolve(root, spec), approved);
   appendFileSync(ledgerPath, `${JSON.stringify(entry)}\n`);
-  console.log(`Spec ${spec} aprobada por ${entry.approver} (${entry.date}). Estado: aprobado. Ya se puede implementar.`);
+  // UserPromptSubmit stdout is added to Claude's context: it confirms the approval and starts implementation.
+  console.log(
+    `Spec ${spec} aprobada por ${entry.approver} (${entry.date}); el hook cambió su cabecera a "Estado: aprobado". ` +
+      `Continúa ahora con la implementación siguiendo el flujo del orquestador (.claude/agents/orchestrator.md, sección 3 desde el paso 4): ` +
+      `lanza el agente developer con la ruta ${spec} según el plan de tareas y después el reviewer. No vuelvas a pedir aprobación.`,
+  );
 }
 
 function gate() {
@@ -128,15 +130,47 @@ function gate() {
     if (isValid(spec, text)) continue;
     const last = lastApproval(spec);
     if (last && isApproved(text)) {
-      block(`la spec ${spec} cambió después de su aprobación (${last.approver}, ${last.date}). El usuario debe volver a escribir "apruebo".`);
+      block(`la spec ${spec} cambió después de su aprobación (${last.approver}, ${last.date}). El usuario debe volver a escribir "apruebo ${spec}".`);
     }
     if (!last && entries(spec).length > 0) {
-      block(`la spec ${spec} no tiene una aprobación con firma válida en este equipo (registro alterado o aprobada en otra máquina). El usuario debe volver a escribir "apruebo".`);
+      block(`la spec ${spec} no tiene una aprobación con firma válida en este equipo (registro alterado o aprobada en otra máquina). El usuario debe volver a escribir "apruebo ${spec}".`);
     }
-    block(`la spec ${spec} no está aprobada. El usuario debe escribir "apruebo" en el chat.`);
+    block(`la spec ${spec} no está aprobada. El usuario debe escribir "apruebo docs/specs/<slug>.md" en el chat.`);
   }
 }
 
-const mode = { record, gate }[process.argv[2]];
+// guard (PreToolUse Write|Edit): Claude may only write specs as `Estado: borrador`.
+// Only the record hook (user's "apruebo") sets `aprobado`.
+// ponytail: Bash redirects (echo > spec.md) bypass this; the gate still rejects unsigned approvals.
+function guard() {
+  const { file_path = "", content, new_string, old_string = "", edits } = input.tool_input ?? {};
+  if (!/(^|[\\/])docs[\\/]specs[\\/][^\\/]+\.md$/i.test(file_path)) return;
+
+  const states = (text = "") => [...text.matchAll(/^\s*-?\s*Estado:[ \t]*(.*)$/gim)].map((m) => m[1].trim());
+  const onlyDraft = (text) => states(text).every((s) => /^borrador\b/i.test(s));
+  const reason = `las specs solo se escriben con "Estado: borrador"; la aprobación la hace el usuario escribiendo "apruebo docs/specs/<slug>.md" (${file_path}).`;
+
+  if (content !== undefined) {
+    if (states(content).length === 0 || !onlyDraft(content)) block(reason);
+    return;
+  }
+  for (const e of edits ?? [{ old_string, new_string }]) {
+    if (!onlyDraft(e.new_string)) block(reason);
+    if (states(e.old_string ?? "").length > 0 && states(e.new_string).length === 0) block(reason);
+  }
+}
+
+// developer (PreToolUse inside the developer agent): specs are read-only for developer.
+// Read/Glob/Grep are allowed; writing tools and any Bash command that names docs/specs are blocked.
+function developer() {
+  const { file_path = "", notebook_path = "", command = "" } = input.tool_input ?? {};
+  const SPEC_PATH = /(^|[\\/\s"'])docs[\\/]specs([\\/]|\b)/i;
+  const tool = input.tool_name ?? "";
+  if (tool === "Bash" ? SPEC_PATH.test(command) : SPEC_PATH.test(file_path || notebook_path)) {
+    block("el agente developer nunca modifica docs/specs/ (solo puede leer las specs con Read).");
+  }
+}
+
+const mode = { record, gate, guard, developer }[process.argv[2]];
 if (!mode) block(`modo desconocido "${process.argv[2]}".`);
 mode();

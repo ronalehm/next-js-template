@@ -29,6 +29,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-approval.mjs\" gate"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-approval.mjs\" guard"
+          }
+        ]
       }
     ]
   }
